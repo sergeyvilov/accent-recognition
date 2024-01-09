@@ -5,8 +5,6 @@ This is a ML-based flask application to distinguish between German, Russian, Spa
 The inference is performed on an ensemble of 10 attention RNN models, fine-tuned on [Speech Accent Archive](https://accent.gmu.edu/) after pre-training on the [MCV dataset](https://commonvoice.mozilla.org/en/datasets).
 More details about model training on MCV can be found [here](https://medium.com/towards-data-science/spoken-language-recognition-on-mozilla-common-voice-part-i-3f5400bbbcd8) and [here](https://medium.com/towards-data-science/spoken-language-recognition-on-mozilla-common-voice-part-ii-models-b32780ea1ee4).
 
-# Installation
-
 The required dependecies can be installed via [conda](https://docs.conda.io/projects/conda/en/latest/user-guide/install/index.html):
 
 ```
