@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+
+<html lang="en" name="viewport" content="width=device-width, initial-scale=1">
+
+<head>
+
+  <meta charset="UTF-8">
+
+  <title>accent recognition</title>
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+  <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js" integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/popper.js@1.12.9/dist/umd/popper.min.js" integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
+
+  <style>
+
+  #record {
+    width: 5em;
+    height: 5em;
+    position: absolute;
+    top: 50%;
+    margin: -2.5em 0 0 -2.5em;
+    left: 50%;
+    border: none;
+    cursor: pointer;
+    background-image: url("static/img/mic_off.png");
+    background-size: 100%;
+    background-repeat: no-repeat;
+    z-index: 10;
+  }
+
+  #mic {
+    border: 1.5px solid;
+    border-color:WhiteSmoke;
+    border-radius: 1em;
+    position: relative;
+    width: 80%;
+    left: 10%;
+    margin: 1.5rem 0 1.5rem 0;
+    padding: 1rem;
+  }
+
+  #downloadlink {
+    color: CornflowerBlue;
+    display: inline-block;
+  }
+
+  .container-fluid {
+    border: 1.5px solid;
+    border-color:WhiteSmoke;
+    border-radius: 0.5em;
+    position: relative;
+    padding:1em;
+    width: 80%;
+    left: 10%;
+    margin: 1.5rem 0 1.5rem 0;
+  }
+
+  #divLoading {
+    margin: 0px;
+    display: none;
+    padding: 0px;
+    position: absolute;
+    right: 0px;
+    top: 0px;
+    width: 100%;
+    height: 100%;
+    background-color: rgb(255, 255, 255);
+    z-index: 30001;
+    opacity: 0.8;}
+
+  #loading {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    }
+
+  </style>
+
+</head>
+
+<body>
+  <div class='container-fluid'>
+    This is an AI-based accent recognition system. It can detect German, Spanish, French, Russian, or English (native)
+    accent in your speech. <br>
+    Click on the microphone icon to record your voice. You can read any English text,
+    it will be recorded for a maximum of 60 seconds. The longer you read, the better your accent
+    can be recognized.
+  </div>
+  <div id='mic'>
+    <div id='record'>
+    </div>
+  </div>
+  <div class='container-fluid d-flex mb-3'>
+    <label> Select the microphone: </label>
+    <select id="mic-select"  class="custom-select custom-select-sm" style='max-width:20rem'>
+    </select>
+    <a class="ml-auto" id="downloadlink" href="url"></a>
+  </div>
+  <div class='container-fluid'  id='chart-container' style='display:none;'>
+    <canvas  id="barchart" style='height:400px'> </canvas>
+  </div>
+  <div id="divLoading">
+    <p id="loading">
+      <img src='static/img/spinner.gif'>
+    </p>
+  </div>
+</body>
+
+<script src="https://unpkg.com/wavesurfer.js@7"></script>
+<script src="https://unpkg.com/wavesurfer.js@7/dist/plugins/record.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.9.4/Chart.js"></script>
+
+<script>
+
+let wavesurfer, record
+let scrollingWaveform = true
+
+const createWaveSurfer = () => {
+
+  // Create an instance of WaveSurfer
+  if (wavesurfer) {
+    wavesurfer.destroy()
+  }
+
+  if (sessionStorage.getItem("record")) {
+    // Restore the previously recorded audio, see https://thecompetentdev.com/weeklyjstips/tips/57_store_binary_in_localstorage/
+    blob = dataURItoBlob(sessionStorage.getItem("record")) //restore record from the session storage
+    const recordedUrl = URL.createObjectURL(blob)
+    wavesurfer = WaveSurfer.create({
+      container: '#mic',
+      waveColor: '#b1e7e0',
+      progressColor: '#FFFFFF',
+      height: '100%',
+      width: '100%',
+      url:recordedUrl,
+    })
+
+    //add download link
+    const link = document.querySelector('#downloadlink')
+
+    Object.assign(link, {
+      href: recordedUrl,
+      download: 'recording.' + blob.type.split(';')[0].split('/')[1] || 'webm',
+      textContent: 'Download recording',
+    })
+
+    //show the bar chart with accent probabilities
+    var yValues = JSON.parse(sessionStorage.getItem("lang_probs")); //restore probs from the sessionStorage
+    var yValues = [yValues["English"],yValues["French"],yValues["German"],yValues["Russian"],yValues["Spanish"]]; //extract probs with the right order
+    var xValues = ["English", "French", "German", "Russian", "Spanish"];
+    var barColors = ["#E69F00", "#56B4E9","#F0E442","#D55E00","#009E73"];
+
+    console.log(yValues); //control
+
+    const barchart = document.querySelector('#chart-container')
+
+    barchart.style.display='block'
+
+    new Chart("barchart", {
+      type: "bar",
+      data: {
+        labels: xValues,
+        datasets: [{
+          backgroundColor: barColors,
+          data: yValues
+        }]
+      },
+      options: {
+        maintainAspectRatio: false,
+        legend: {display: false},
+        scales: {
+          xAxes: [
+            {
+              ticks: {
+                autoSkip: false,
+                fontSize: 25,
+              },
+              scaleLabel: {
+                display: true,
+                fontSize: 16,
+                padding:{
+                  bottom: -5,
+                }
+              }
+            }
+          ],
+          yAxes: [
+            {
+              ticks: {
+                fontSize: 25,
+                suggestedMin: 0,
+                suggestedMax: 100,
+              },
+              scaleLabel: {
+                display: true,
+                fontSize: 25,
+                labelString: "accent probability, %",
+              }
+            }
+          ]
+        }
+      }
+    });
+
+  Chart.defaults.global.defaultFontFamily = 'Monospace';
+
+  } else {
+    wavesurfer = WaveSurfer.create({
+      container: '#mic',
+      waveColor: '#d1e7e0',
+      progressColor: '#FFFFFF',
+    })
+  }
+
+  // Initialize the Record plugin
+  record = wavesurfer.registerPlugin(WaveSurfer.Record.create({ scrollingWaveform, renderRecordedAudio: true, audioBitsPerSecond: 16000 }))
+
+  record.on('record-end', (blob) => {
+
+    //conver audio to String, see https://thecompetentdev.com/weeklyjstips/tips/57_store_binary_in_localstorage/
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      sessionStorage.setItem("record", event.target.result);
+    }
+    reader.readAsDataURL(blob);
+
+    sendData(blob) //send record as a blob for the inference
+  })
+}
+
+//navigator.mediaDevices.getUserMedia({ audio: true }) //ask user for the microphone
+
+const micSelect = document.querySelector('#mic-select')
+{
+  // add all available devices
+  WaveSurfer.Record.getAvailableAudioDevices().then((devices) => {
+
+    devices.forEach((device) => {
+
+      const option = document.createElement('option')
+      option.value = device.deviceId
+      option.text = device.label || device.deviceId
+      micSelect.appendChild(option)
+    })
+  })
+}
+
+recButton = document.getElementById("record")
+
+recButton.onclick = () =>  {
+  if (record.isRecording()) {
+    //stop recording
+    record.stopRecording()
+    recButton.style.backgroundImage = "url('static/img/mic_off.png')";
+    return
+  }
+  //start recording
+  const deviceId = micSelect.value
+  record.startRecording({ deviceId }).then(() => {
+    recButton.style.backgroundImage = "url('static/img/mic_on.png')";
+  })
+}
+
+createWaveSurfer()
+
+var base_url = window.location.origin; //base website address
+
+function sendData(data) {
+  //send record for accent inference and collect result
+  document.getElementById('divLoading').style.display = 'block';//show loading snipper
+
+  var form = new FormData();
+  form.append('file', data, 'file')
+  fetch(base_url + '/process-record', {
+    method: 'POST',
+    body: form
+
+  }).then(response => response.json()
+).then(json => {
+  console.log(json);
+  sessionStorage.setItem("lang_probs",JSON.stringify(json)); //inference result to sessionStorage
+  window.location.href = base_url;//redirect to the start page
+});
+}
+
+function dataURItoBlob(dataURI) {
+
+  //source: https://gist.github.com/davoclavo/4424731
+  // convert base64 to raw binary data held in a string
+  var byteString = atob(dataURI.split(',')[1]);
+
+  // separate out the mime component
+  var mimeString = dataURI.split(',')[0].split(':')[1].split(';')[0];
+
+  // write the bytes of the string to an ArrayBuffer
+  var arrayBuffer = new ArrayBuffer(byteString.length);
+  var _ia = new Uint8Array(arrayBuffer);
+  for (var i = 0; i < byteString.length; i++) {
+    _ia[i] = byteString.charCodeAt(i);
+  }
+
+  var dataView = new DataView(arrayBuffer);
+  var blob = new Blob([dataView], { type: mimeString });
+  return blob;
+}
+
+</script>
+</html>
